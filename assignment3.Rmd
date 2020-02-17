@@ -1,7 +1,7 @@
 ---
 title: "Statistical assignment 3"
-author: "[add your name here] [add your candidate number here - mandatory]"
-date: "[add date here]"
+author: "Eliot Barrett - Holman 087675"
+date: "12/02/20"
 output: github_document
 ---
 
@@ -33,7 +33,7 @@ library(data.table)
 
 files <- dir(
              # Select the folder where the files are stored.
-             "[add your path here]",
+             "C:/Users/eliot/Documents/Politics and IR/Year 2 Term 2/Data 3/Data3_blank/data/UKDA-6614-tab/tab",
              # Tell R which pattern you want present in the files it will display.
              pattern = "indresp",
              # We want this process to repeat through the entire folder.
@@ -73,8 +73,13 @@ for (i in 1:7) {
 Now we have got the data from all 7 waves in the same data frame **all7** in the wide format. Note that the panel is unbalanced, i.e. we included all people who participated in at least one wave of the survey. Reshape the data to the long format. The resulting data frame should have six columns for six variables.
 
 ```{r}
-Long <- all7 %>%
-  ...
+# first select the variables that we care about
+
+Long <- all7 %>% pivot_longer(c(a_memorig:g_vote6), names_to = "variable", values_to = "value") %>%
+  separate(variable, into = c("Wave", "Variable") , sep = "_", extra = "merge") %>%
+  pivot_wider(names_from = Variable, values_from = value)
+
+  
 Long
 ```
 
@@ -84,14 +89,17 @@ Now we want to filter the data keeping only respondents from the original UKHLS 
 
 ```{r}
 Long <- Long %>%
-        filter(...) %>%
-        mutate(sex_dv = ...) %>%
-        mutate(vote6 = ...)
+        filter(memorig == 1) %>%
+        mutate(sex = recode(sex_dv,
+                            `1` = "male",
+                            `2` = "female",
+                            .default = NA_character_)) %>%
 
-Long %>%
-        ...
-Long %>%
-        ...
+       mutate(vote6 = ifelse(vote6 < 0, NA_integer_, vote6)
+                             )
+
+table(Long$sex)
+table(Long$vote6)
 
 ```
 
@@ -101,7 +109,9 @@ Political interest is an ordinal variable, but we will treat it as interval and 
 
 ```{r}
 meanVote6 <- Long %>%
-        ...
+  group_by(sex, Wave) %>%
+   summarise( meanVote6 = mean(vote6, na.rm = TRUE))
+      
         
 meanVote6
 ```
@@ -120,8 +130,10 @@ In the cells of this table you should have mean political interest by sex and wa
 Write a short interpretation of your findings.
 
 ```{r}
-meanVote6 %>%
-        ...
+meanVote6
+
+meanVote6 %>% pivot_wider(names_from = Wave, values_from = meanVote6)
+        
 ```
 
 ## Estimate stability of political interest (30 points)
@@ -147,6 +159,44 @@ Write the R code that does the following.
 5. Write a short interpretation of your findings.
 
 ```{r}
-...
+
+
+#set all negative values of vote 6 to NA so its easier to remove them
+all7$a_vote6 <- ifelse(all7$a_vote6 < 0, NA, all7$a_vote6)
+all7$b_vote6 <- ifelse(all7$b_vote6 < 0, NA, all7$b_vote6)
+all7$c_vote6 <- ifelse(all7$c_vote6 < 0, NA, all7$c_vote6)
+all7$d_vote6 <- ifelse(all7$d_vote6 < 0, NA, all7$d_vote6)
+all7$e_vote6 <- ifelse(all7$e_vote6 < 0, NA, all7$e_vote6)
+all7$f_vote6 <- ifelse(all7$f_vote6 < 0, NA, all7$f_vote6)
+all7$g_vote6 <- ifelse(all7$g_vote6 < 0, NA, all7$g_vote6)
+
+NONA <- all7 %>% filter(!is.na(a_vote6))%>% filter(!is.na(b_vote6))%>% filter(!is.na(c_vote6))%>% filter(!is.na(d_vote6))%>% filter(!is.na(e_vote6))%>% filter(!is.na(f_vote6)) %>% filter(!is.na(g_vote6))
+# now we have a data frame with only respondents with non-missing values for political interest in all 7 waves
+
+NONA <- NONA %>% mutate( delta = abs(b_vote6 - a_vote6) + abs(c_vote6 - b_vote6) + abs(d_vote6 - c_vote6) + abs(d_vote6 - e_vote6) + abs(e_vote6 - f_vote6) + abs(f_vote6 - g_vote6))
+# now we have delta for each person in the dataset
+
+# mean delta for men and women 
+
+NONA %>% group_by(a_sex_dv) %>% summarise(mean_delta = mean(delta))
+# 1 is male and 2 is female
+# male mean delta = 2.610134
+# female mean delta = 2.586267
+
+?scatter.smooth
+# calculate mean delta by age at wave 1
+mean_delta_age <- NONA %>% group_by(a_age_dv) %>% summarise(mean_delta = mean(delta))
+
+
+scatter.smooth(mean_delta_age,
+               xlab = "age at first wave",
+               ylab = "mean delta",
+               main = "graph showing mean delta against age")
+
+# here we see that stability of political interest is strongest for the oldest members of the survey at wave 1
+# while political interest is fairly stable for the younger groups as well (around 2.7)
+# interestingly we see a dip in stability of political interest in middle-aged groups at the beginning of the survey
+# we see outliers at the oldest ages in stability of political interest, perhaps due to such a low number of these #involved in the sample and who completed each wave 
+
 
 ```
